@@ -3,8 +3,8 @@
 //  PostsApp
 //
 
-import Foundation
 import UIKit
+import AWSAppSync
 
 class UpdatePostViewController: UIViewController {
     
