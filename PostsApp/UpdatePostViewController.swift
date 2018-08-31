@@ -14,13 +14,19 @@ class UpdatePostViewController: UIViewController {
     @IBOutlet weak var contentInput: UITextField!
     @IBOutlet weak var urlInput: UITextField!
     var updatePostDelegate: PostUpdates?
+
+    var updatePostMutation: UpdatePostMutation?
+    var updatePostInput: UpdatePostInput?
+    var appSyncClient: AWSAppSyncClient?
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        authorInput.text = post?.author
-        titleInput.text = post?.title
-        contentInput.text = post?.content
-        urlInput.text = post?.url
+        let appDelegate = UIApplication.shared.delegate as! AppDelegate
+        appSyncClient = appDelegate.appSyncClient!
+        authorInput.text = updatePostInput?.author!
+        titleInput.text = updatePostInput?.title!
+        contentInput.text = updatePostInput?.content!
+        urlInput.text = updatePostInput?.url!
     }
     
     override func didReceiveMemoryWarning() {
@@ -29,9 +35,23 @@ class UpdatePostViewController: UIViewController {
     }
     
     @IBAction func updatePost(_ sender: Any) {
-        let post = Post(id: self.post!.id, author: authorInput.text!, title: titleInput.text, content: contentInput.text, url: urlInput.text)
-        updatePostDelegate?.postUpdated(post: post)
-        self.dismiss(animated: true, completion: nil)
+        updatePostInput?.author = authorInput.text!
+        updatePostInput?.title = titleInput.text
+        updatePostInput?.content = contentInput.text
+        updatePostInput?.url = urlInput.text
+        updatePostMutation = UpdatePostMutation(input: updatePostInput!)
+
+        appSyncClient?.perform(mutation: updatePostMutation!) { (result, error) in
+            if let error = error as? AWSAppSyncClientError {
+                print("Error occurred while making request: \(error.localizedDescription )")
+                return
+            }
+            if let resultError = result?.errors {
+                print("Error saving the item on server: \(resultError)")
+                return
+            }
+            self.dismiss(animated: true, completion: nil)
+        }
     }
     
     @IBAction func onCancel(_ sender: Any) {
