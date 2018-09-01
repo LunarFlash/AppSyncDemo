@@ -1,7 +1,7 @@
 //
 //  AppDelegate.swift
 //  PostsApp
-//
+//  https://docs.aws.amazon.com/appsync/latest/devguide/building-a-client-app-ios.html
 
 
 import UIKit
