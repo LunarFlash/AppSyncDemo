@@ -33,7 +33,6 @@ class AddPostViewController: UIViewController {
     @IBOutlet weak var titleInput: UITextField!
     @IBOutlet weak var contentInput: UITextField!
     @IBOutlet weak var urlInput: UITextField!
-    var newPostDelegate: PostUpdates?
     var appSyncClient: AWSAppSyncClient?
     
     override func viewDidLoad() {

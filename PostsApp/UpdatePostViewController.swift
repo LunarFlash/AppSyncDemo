@@ -13,7 +13,6 @@ class UpdatePostViewController: UIViewController {
     @IBOutlet weak var titleInput: UITextField!
     @IBOutlet weak var contentInput: UITextField!
     @IBOutlet weak var urlInput: UITextField!
-    var updatePostDelegate: PostUpdates?
 
     var updatePostMutation: UpdatePostMutation?
     var updatePostInput: UpdatePostInput?

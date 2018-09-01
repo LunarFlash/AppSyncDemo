@@ -4,6 +4,7 @@
 //
 
 import UIKit
+import AWSAppSync
 
 class PostCell: UITableViewCell {
     @IBOutlet weak var authorLabel: UILabel!
@@ -17,77 +18,67 @@ class PostCell: UITableViewCell {
     }
 }
 
-protocol PostUpdates {
-    func newPostAdded(post: Post)
-    func postUpdated(post: Post)
-    func postDeleted(post: Post)
-}
-
-class PostListViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, PostUpdates {
-    func postUpdated(post: Post) {
-        var postition = -1
-        for  i in 0..<postList.count {
-            if (post.id == postList[i].id) {
-                postition = i
-            }
-        }
-        
-        if (postition != -1) {
-            postList.remove(at: postition)
-            postList.insert(post, at: postition)
-        }
-        self.tableView.reloadData()
-    }
-    
-    func postDeleted(post: Post) {
-        var postition = -1
-        for  i in 0..<postList.count {
-            if (post.id == postList[i].id) {
-                postition = i
-            }
-        }
-        if (postition != -1) {
-            postList.remove(at: postition)
-        }
-        self.tableView.reloadData()
-    }
-    
+class PostListViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
     
     @IBOutlet weak var tableView: UITableView!
-    var postList = [Post]()
+    var appSyncClient: AWSAppSyncClient?
+    var postList: [AllPostsQuery.Data.ListPost.Item?]? = [] {
+        didSet {
+            tableView.reloadData()
+        }
+    }
+
+    func loadAllPosts() {
+
+        appSyncClient?.fetch(query: AllPostsQuery(), cachePolicy: .returnCacheDataAndFetch)  { (result, error) in
+            if error != nil {
+                print(error?.localizedDescription ?? "")
+                return
+            }
+            self.postList = result?.data?.listPosts?.items
+        }
+    }
+
+    func loadAllPostsFromCache() {
+
+        appSyncClient?.fetch(query: AllPostsQuery(), cachePolicy: .returnCacheDataDontFetch)  { (result, error) in
+            if error != nil {
+                print(error?.localizedDescription ?? "")
+                return
+            }
+            self.postList = result?.data?.listPosts?.items
+        }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view, typically from a nib.
         self.automaticallyAdjustsScrollViewInsets = false
-        
+        let appDelegate = UIApplication.shared.delegate as! AppDelegate
+        appSyncClient = appDelegate.appSyncClient
+        loadAllPosts()
         self.tableView.dataSource = self
         self.tableView.delegate = self
-        
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Add", style: .plain, target: self, action: #selector(addTapped))
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        loadAllPostsFromCache()
     }
     
     @objc func addTapped() {
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
         let controller = storyboard.instantiateViewController(withIdentifier: "NewPostViewController") as! AddPostViewController
-        controller.newPostDelegate = self
         self.present(controller, animated: true, completion: nil)
-        
-    }
-
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return postList.count
+        return postList?.count ?? 0
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        
         let cell = tableView.dequeueReusableCell(withIdentifier: "PostCell", for: indexPath) as! PostCell
-        let post = postList[indexPath.row]
+        let post = postList![indexPath.row]!
         cell.updateValues(author: post.author, title: post.title, content: post.content)
         return cell
     }
@@ -96,27 +87,24 @@ class PostListViewController: UIViewController, UITableViewDelegate, UITableView
         return true
     }
     
+    
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         if (editingStyle == UITableViewCellEditingStyle.delete) {
-            postList.remove(at: indexPath.row)
+            let id = postList![indexPath.row]?.id
+            let deletePostMutation = DeletePostMutation(input: DeletePostInput(id: id!))
+            appSyncClient?.perform(mutation: deletePostMutation) { result, err in
+                self.postList?.remove(at: indexPath.row)
+            }
             self.tableView.reloadData()
         }
     }
-    
+
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        
-        let post = postList[indexPath.row]
-        
+        let post = postList![indexPath.row]!
         let storyboard = UIStoryboard(name: "Main", bundle: nil)
         let controller = storyboard.instantiateViewController(withIdentifier: "UpdatePostViewController") as! UpdatePostViewController
-        controller.post = post
-        controller.updatePostDelegate = self
+        controller.updatePostInput = UpdatePostInput(id: post.id, author: post.author, title: post.title, content: post.content, url: post.url, ups: 1, downs: 0, version: post.version)
         self.present(controller, animated: true, completion: nil)
-    }
-    
-    func newPostAdded(post: Post) {
-        postList.append(post)
-        tableView.reloadData()
     }
 
 }
