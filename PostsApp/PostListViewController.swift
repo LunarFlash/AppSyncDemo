@@ -59,6 +59,7 @@ class PostListViewController: UIViewController, UITableViewDelegate, UITableView
         self.tableView.dataSource = self
         self.tableView.delegate = self
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Add", style: .plain, target: self, action: #selector(addTapped))
+        startNewPostSubscription()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -107,5 +108,36 @@ class PostListViewController: UIViewController, UITableViewDelegate, UITableView
         self.present(controller, animated: true, completion: nil)
     }
 
+    func startNewPostSubscription() {
+        let subscription = OnCreatePostSubscription()
+        do {
+            _ = try appSyncClient?.subscribe(subscription: subscription, resultHandler: { (result, transaction, error) in
+                if let result = result {
+                    // Store a reference to the new object
+                    let newPost = result.data!.onCreatePost!
+                    // Create a new object for the desired query, where the new object content should reside
+                    let postToAdd = AllPostsQuery.Data.ListPost.Item(id: newPost.id,
+                                                                     title: newPost.title,
+                                                                     author: newPost.author,
+                                                                     content: newPost.content,
+                                                                     url: newPost.url,
+                                                                     version: 1)
+                    do {
+                        // Update the local store with the newly received data
+                        try transaction?.update(query: AllPostsQuery()) { (data: inout AllPostsQuery.Data) in
+                            data.listPosts?.items?.append(postToAdd)
+                        }
+                        self.loadAllPostsFromCache()
+                    } catch {
+                        print("Error updating store")
+                    }
+                } else if let error = error {
+                    print(error.localizedDescription)
+                }
+            })
+        } catch {
+            print("Error starting subscription.")
+        }
+    }
 }
 
